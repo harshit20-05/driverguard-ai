@@ -1,4 +1,9 @@
 # DRIVERGUARD AI
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://driverguard-ai.streamlit.app)
+[![Streamlit App](https://img.shields.io/badge/Live_Demo-Streamlit_Cloud-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://driverguard-ai.streamlit.app)
+
+> 🚀 **Live Interactive Demo**: Try DriverGuard AI directly in your browser: **[driverguard-ai.streamlit.app](https://driverguard-ai.streamlit.app)**
+
 ### Real-Time Driver Drowsiness & Fatigue Detection System
 > **Production-grade Computer Vision & Generative AI edge assistance system for commercial and consumer vehicular safety.**
 
