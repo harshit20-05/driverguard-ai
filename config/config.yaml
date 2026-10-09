@@ -1,0 +1,79 @@
+# ==============================================================================
+# DriverGuard AI - Configuration
+# Real-Time Driver Drowsiness & Fatigue Detection System
+# ==============================================================================
+
+app:
+  name: "DRIVERGUARD AI"
+  tagline: "Real-Time AI for Safer Driving"
+  version: "1.0.0"
+  debug: false
+  theme: "dark"
+
+vision:
+  camera_index: 0
+  frame_width: 640
+  frame_height: 480
+  target_fps: 30
+  face_mesh:
+    max_num_faces: 1
+    refine_landmarks: true
+    min_detection_confidence: 0.6
+    min_tracking_confidence: 0.6
+  eye_processing:
+    input_size: [64, 64]
+    crop_padding_ratio: 0.28
+    clahe_clip_limit: 2.0
+    clahe_grid_size: [8, 8]
+    normalize_range: [0.0, 1.0]
+
+model:
+  weights_path: "models/eye_classifier.keras"
+  metadata_path: "models/model_metadata.json"
+  input_shape: [64, 64, 3]
+  open_threshold: 0.50
+  confidence_smoothing_window: 5
+
+detection:
+  blink_min_duration_ms: 80
+  blink_max_duration_ms: 380
+  warning_threshold_ms: 1200
+  critical_threshold_ms: 2200
+  recovery_open_frames: 6
+
+fatigue:
+  window_duration_seconds: 60
+  weights:
+    perclos: 0.40
+    prolonged_closures: 0.35
+    blink_frequency: 0.15
+    event_severity: 0.10
+  levels:
+    low: [0, 30]
+    moderate: [31, 60]
+    high: [61, 80]
+    critical: [81, 100]
+
+alerts:
+  enable_sound: false
+  sound_frequency: 1000
+  sound_duration_ms: 300
+  warning_color: "#EAB308"   # Amber / Yellow
+  critical_color: "#EF4444"  # Red
+  alert_color: "#10B981"     # Emerald Green
+
+analytics:
+  db_path: "data/sessions.db"
+  export_dir: "data/exports"
+  log_interval_seconds: 1
+
+ai:
+  model_name: "gemini-2.0-flash"
+  temperature: 0.2
+  max_output_tokens: 1500
+  timeout_seconds: 15
+
+privacy:
+  store_raw_video: false
+  store_eye_crops: false
+  anonymize_session_data: false

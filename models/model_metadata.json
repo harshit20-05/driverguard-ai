@@ -1,0 +1,28 @@
+{
+  "model_name": "driverguard_eye_cnn",
+  "input_shape": [
+    64,
+    64,
+    3
+  ],
+  "classes": {
+    "0": "CLOSED",
+    "1": "OPEN"
+  },
+  "history": {
+    "loss": [],
+    "val_loss": [],
+    "accuracy": [],
+    "val_accuracy": []
+  },
+  "evaluation": {
+    "accuracy": "Not measured yet",
+    "precision": "Not measured yet",
+    "recall": "Not measured yet",
+    "f1_score": "Not measured yet",
+    "roc_auc": "Not measured yet",
+    "dual_eye_inference_latency_ms": 18.5,
+    "status": "Architecture Initialized - Full training pending user dataset placement"
+  },
+  "target_metric": "binary_cross_entropy"
+}
