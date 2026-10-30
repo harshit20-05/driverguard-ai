@@ -52,6 +52,25 @@ class EyeStateClassifier:
 
         self._load_model()
 
+    @property
+    def is_model_trained(self) -> bool:
+        """Checks if model weights have been trained or if it's an uncalibrated skeleton."""
+        meta_path = os.path.join(os.path.dirname(self.weights_path), "model_metadata.json")
+        if os.path.exists(meta_path):
+            try:
+                import json
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                    status = meta.get("evaluation", {}).get("status", "")
+                    if "Architecture Initialized" in status or "pending" in status.lower():
+                        return False
+                    acc = meta.get("evaluation", {}).get("accuracy")
+                    if isinstance(acc, (int, float)) and acc > 0.6:
+                        return True
+            except Exception:
+                pass
+        return False
+
     def _load_model(self) -> bool:
         """Loads the trained Keras model if the file exists."""
         if not os.path.exists(self.weights_path):
@@ -100,7 +119,7 @@ class EyeStateClassifier:
 
         start_time = time.perf_counter()
 
-        if self._model_loaded and self._model is not None:
+        if self._model_loaded and self._model is not None and self.is_model_trained:
             # 1. Prepare batch of 2 eyes (left, right)
             batch = self.preprocessor.prepare_batch(eye_data.left_crop, eye_data.right_crop)
             # 2. Run batched CNN inference
