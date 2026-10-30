@@ -271,6 +271,101 @@ section[data-testid="stSidebar"] > div {
     50% { border-color: rgba(239, 68, 68, 0.4); box-shadow: none; }
 }
 
+/* ── Button Theme (High-Contrast Automotive Executive Cockpit) ── */
+div[data-testid="stButton"] > button,
+.stButton > button,
+button[data-testid="baseButton-secondary"] {
+    background-color: #1E293B !important;
+    background-image: linear-gradient(180deg, #28364C 0%, #151F30 100%) !important;
+    color: #F8FAFC !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-radius: 9px !important;
+    padding: 0.60rem 1.3rem !important;
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.01em !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+div[data-testid="stButton"] > button:hover,
+.stButton > button:hover,
+button[data-testid="baseButton-secondary"]:hover {
+    background-color: #2D3E57 !important;
+    background-image: linear-gradient(180deg, #374B69 0%, #202D42 100%) !important;
+    color: #38BDF8 !important;
+    border-color: #38BDF8 !important;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.45) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Primary Action Buttons (Vibrant Cyber Blue / Cyan) */
+div[data-testid="stButton"] > button[kind="primary"],
+.stButton > button[kind="primary"],
+button[data-testid="baseButton-primary"] {
+    background-color: #0284C7 !important;
+    background-image: linear-gradient(135deg, #0284C7 0%, #0369A1 100%) !important;
+    color: #FFFFFF !important;
+    border: 1px solid #38BDF8 !important;
+    border-radius: 9px !important;
+    font-size: 1.05rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.01em !important;
+    box-shadow: 0 4px 20px rgba(2, 132, 199, 0.55) !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+div[data-testid="stButton"] > button[kind="primary"]:hover,
+.stButton > button[kind="primary"]:hover,
+button[data-testid="baseButton-primary"]:hover {
+    background-color: #0EA5E9 !important;
+    background-image: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%) !important;
+    color: #FFFFFF !important;
+    border-color: #7DD3FC !important;
+    box-shadow: 0 0 24px rgba(14, 165, 233, 0.80) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Download Buttons */
+div[data-testid="stDownloadButton"] > button {
+    background: #1E293B !important;
+    color: #F8FAFC !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+}
+div[data-testid="stDownloadButton"] > button:hover {
+    background: #2D3E57 !important;
+    border-color: #38BDF8 !important;
+    color: #FFFFFF !important;
+}
+
+/* ── Video Stream Display Container Protection ──────────────── */
+div[data-testid="stImage"] {
+    width: 100% !important;
+    min-height: 400px !important;
+    background: #020617 !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.85) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+div[data-testid="stImage"] img {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 400px !important;
+    max-height: 520px !important;
+    object-fit: cover !important;
+    border-radius: 12px !important;
+    display: block !important;
+}
+
 /* ── Hero Video Container ───────────────────────────────── */
 .video-wrapper {
     background: #000000;
@@ -489,7 +584,7 @@ def draw_professional_hud(
         badge_text = "NO DRIVER"
     else:
         border_clr = (100, 200, 16)     # Electric Emerald
-        label = "DRIVER ATTENTIVE — NOMINAL"
+        label = "DRIVER ATTENTIVE - NOMINAL"
         badge_text = "ALL CLEAR"
 
     # Thin outer frame border
@@ -580,7 +675,7 @@ with st.sidebar:
 
     # Primary Session Controls
     if not st.session_state.active_session:
-        if st.button("⚡ Start Monitoring", type="primary", use_container_width=True):
+        if st.button("⚡ Start Monitoring", type="primary", width="stretch", key="sidebar_start_btn"):
             st.session_state.active_session = True
             st.session_state.tracker = SessionTracker()
             st.session_state.blink_det.reset()
@@ -596,7 +691,7 @@ with st.sidebar:
 
             st.rerun()
     else:
-        if st.button("⏹ Stop Monitoring", use_container_width=True):
+        if st.button("⏹ Stop Monitoring", width="stretch", key="sidebar_stop_btn"):
             st.session_state.active_session = False
             if st.session_state.cap is not None:
                 st.session_state.cap.release()
@@ -720,7 +815,7 @@ if page == "Monitor":
         # Center Action Button
         col_c1, col_c2, col_c3 = st.columns([1, 2, 1])
         with col_c2:
-            if st.button("⚡ Start Active Driver Monitoring", type="primary", use_container_width=True, key="hero_start_btn"):
+            if st.button("⚡ Start Active Driver Monitoring", type="primary", width="stretch", key="hero_start_btn"):
                 st.session_state.active_session = True
                 st.session_state.tracker = SessionTracker()
                 st.session_state.blink_det.reset()
@@ -781,31 +876,34 @@ if page == "Monitor":
             perf_ph = st.empty()
             col_act1, col_act2 = st.columns(2)
             with col_act1:
-                if st.button("⏹ Stop Monitoring", key="stop_live_btn", use_container_width=True):
-                    st.session_state.active_session = False
-                    if st.session_state.cap is not None:
-                        st.session_state.cap.release()
-                        st.session_state.cap = None
-                    if st.session_state.tracker:
-                        summary = st.session_state.tracker.finish()
-                        C["db"].save_session(
-                            summary,
-                            st.session_state.tracker.samples,
-                            st.session_state.tracker.events
-                        )
-                        st.session_state.last_session_summary = summary
-                    st.rerun()
+                stop_btn = st.button("⏹ Stop Monitoring", key="stop_live_btn", width="stretch")
             with col_act2:
-                if st.button("⚡ Recalibrate Baseline", key="recalib_btn", use_container_width=True):
-                    C["calibrator"].start(current_time=time.time())
-                    st.session_state.calibrating = True
-                    st.rerun()
+                recalib_btn = st.button("⚡ Recalibrate Baseline", key="recalib_btn", width="stretch")
 
         with col_telemetry:
             ph_vigilance = st.empty()
             ph_state = st.empty()
             ph_eyes = st.empty()
             ph_attention = st.empty()
+
+        if stop_btn:
+            st.session_state.active_session = False
+            if st.session_state.cap is not None:
+                st.session_state.cap.release()
+                st.session_state.cap = None
+            if st.session_state.tracker:
+                summary = st.session_state.tracker.finish()
+                C["db"].save_session(
+                    summary,
+                    st.session_state.tracker.samples,
+                    st.session_state.tracker.events
+                )
+                st.session_state.last_session_summary = summary
+            st.rerun()
+
+        if recalib_btn:
+            C["calibrator"].start(current_time=time.time())
+            st.session_state.calibrating = True
 
         # ── Capture Frame from Hardware Camera ──────────────────────────────
         cam_idx = st.session_state.get("cam_index", 0)
@@ -828,26 +926,18 @@ if page == "Monitor":
                     st.session_state.cap.read()
 
         cap = st.session_state.cap
-        frame = None
-        ret = False
 
-        if cap and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret or frame is None:
-                # Retry once in case of dropped frame
-                ret, frame = cap.read()
-
-        if not ret or frame is None:
-            st.error(f"⚠️ Cannot connect to Hardware Camera {cam_idx}. Ensure no other application (Zoom, Teams, Camera app) is using the webcam.")
+        if not cap or not cap.isOpened():
+            banner_ph.error(f"⚠️ Cannot connect to Hardware Camera {cam_idx}. Ensure no other application (Zoom, Teams, Camera app) is using the webcam.")
             col_err1, col_err2 = st.columns(2)
             with col_err1:
-                if st.button("🔄 Retry Camera Connection", use_container_width=True):
+                if st.button("🔄 Retry Camera Connection", width="stretch", key="err_retry_btn"):
                     if st.session_state.cap is not None:
                         st.session_state.cap.release()
                         st.session_state.cap = None
                     st.rerun()
             with col_err2:
-                if st.button("Switch to Camera 1", use_container_width=True):
+                if st.button("Switch to Camera 1", width="stretch", key="err_switch_btn"):
                     if st.session_state.cap is not None:
                         st.session_state.cap.release()
                         st.session_state.cap = None
@@ -855,289 +945,297 @@ if page == "Monitor":
                     st.rerun()
             st.stop()
 
-        # ── Process Frame ───────────────────────────────────────────────────
-        t0 = time.perf_counter()
+        # ── In-Place Real-Time Vision Loop (High-FPS & Low Latency) ──────────
+        while st.session_state.active_session:
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                # Retry once in case of dropped frame
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    time.sleep(0.04)
+                    continue
 
-        # Mirror frame horizontally so it looks natural (like a rear-view mirror)
-        frame = cv2.flip(frame, 1)
-        h, w = frame.shape[:2]
+            t0 = time.perf_counter()
 
-        st.session_state.frame_idx += 1
-        _frame_idx = st.session_state.frame_idx
-        now_ts = time.time()
+            # Mirror frame horizontally so it looks natural (like a rear-view mirror)
+            frame = cv2.flip(frame, 1)
+            h, w = frame.shape[:2]
 
-        # 1. Cabin Illumination & CLAHE Enhancement
-        mean_lum, is_poor_light, frame_processed = C["preprocessor"].check_lighting(frame)
+            st.session_state.frame_idx += 1
+            _frame_idx = st.session_state.frame_idx
+            now_ts = time.time()
 
-        # 2. Face Landmarks & Eye Cropping
-        det_res = C["detector"].detect(frame_processed)
-        has_face = (det_res.landmarks_px is not None)
-        eye_data = C["eye_detector"].extract_eyes(frame_processed, det_res.landmarks_px)
+            # 1. Cabin Illumination & CLAHE Enhancement
+            mean_lum, is_poor_light, frame_processed = C["preprocessor"].check_lighting(frame)
 
-        # 3. Hybrid Eye Classification (Calibrated Geometric EAR + CNN)
-        pred = C["hybrid_classifier"].predict(eye_data)
+            # 2. Face Landmarks & Eye Cropping
+            det_res = C["detector"].detect(frame_processed)
+            has_face = (det_res.landmarks_px is not None)
+            eye_data = C["eye_detector"].extract_eyes(frame_processed, det_res.landmarks_px)
 
-        # 4. Yawn Detection (MAR)
-        yawn_status = C["yawn_detector"].update(det_res.landmarks_px, now_ts)
+            # 3. Hybrid Eye Classification (Calibrated Geometric EAR + CNN)
+            pred = C["hybrid_classifier"].predict(eye_data)
 
-        # 5. 3D Head Pose (solvePnP)
-        head_status = C["head_pose"].update(det_res.landmarks_px, w, h, now_ts)
+            # 4. Yawn Detection (MAR)
+            yawn_status = C["yawn_detector"].update(det_res.landmarks_px, now_ts)
 
-        # 6. Phone Distraction (MediaPipe Hands)
-        if _frame_idx % 2 == 0:
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            st.session_state.last_phone_status = C["distraction"].detect(frame_rgb, det_res.face_bbox)
-        phone_det = st.session_state.last_phone_status.phone_detected if st.session_state.last_phone_status else False
+            # 5. 3D Head Pose (solvePnP)
+            head_status = C["head_pose"].update(det_res.landmarks_px, w, h, now_ts)
 
-        # 7. Adaptive Calibration
-        if st.session_state.calibrating:
-            calib_done, progress, calib_res = C["calibrator"].update(
-                ear=pred.ear_val if has_face else None,
-                mar=yawn_status.mar if has_face else None,
-                pitch=head_status.pitch if has_face else None,
-                yaw=head_status.yaw if has_face else None,
-                current_time=now_ts
+            # 6. Phone Distraction (MediaPipe Hands throttled to every 6 frames for 30 FPS)
+            if _frame_idx % 6 == 0:
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                st.session_state.last_phone_status = C["distraction"].detect(frame_rgb, det_res.face_bbox)
+            phone_det = st.session_state.last_phone_status.phone_detected if st.session_state.last_phone_status else False
+
+            # 7. Adaptive Calibration
+            if st.session_state.calibrating:
+                calib_done, progress, calib_res = C["calibrator"].update(
+                    ear=pred.ear_val if has_face else None,
+                    mar=yawn_status.mar if has_face else None,
+                    pitch=head_status.pitch if has_face else None,
+                    yaw=head_status.yaw if has_face else None,
+                    current_time=now_ts
+                )
+                st.session_state.calib_progress = progress
+                if calib_done:
+                    st.session_state.calibrating = False
+                    C["hybrid_classifier"].set_ear_threshold(calib_res.adaptive_ear_threshold)
+                    C["yawn_detector"].baseline_mar = calib_res.baseline_mar
+                    C["head_pose"].baseline_pitch = calib_res.baseline_pitch
+                    C["head_pose"].baseline_yaw = calib_res.baseline_yaw
+                    calib_ph.success(f"Driver Calibration Complete: Threshold adapted to {calib_res.adaptive_ear_threshold:.3f}")
+
+            # 8. Temporal State Machine & Fatigue Score
+            drowsy_st = st.session_state.drowsy_det.update(pred.is_closed if has_face else False, now_ts)
+            blink_occ = st.session_state.blink_det.update(pred.is_closed if has_face else False, now_ts)
+            bpm = st.session_state.blink_det.blinks_per_minute
+
+            fatigue_res = st.session_state.fatigue_calc.update(
+                is_closed=pred.is_closed if has_face else False,
+                closure_duration_ms=drowsy_st.closure_duration_ms,
+                blinks_per_min=bpm,
+                recent_drowsy_events=drowsy_st.total_drowsy_events,
+                recent_critical_events=drowsy_st.total_critical_events,
+                current_time=now_ts,
+                recent_yawns=yawn_status.total_yawns,
+                recent_nods=head_status.total_nod_events
             )
-            st.session_state.calib_progress = progress
-            if calib_done:
-                st.session_state.calibrating = False
-                C["hybrid_classifier"].set_ear_threshold(calib_res.adaptive_ear_threshold)
-                C["yawn_detector"].baseline_mar = calib_res.baseline_mar
-                C["head_pose"].baseline_pitch = calib_res.baseline_pitch
-                C["head_pose"].baseline_yaw = calib_res.baseline_yaw
-                calib_ph.success(f"Driver Calibration Complete: Threshold adapted to {calib_res.adaptive_ear_threshold:.3f}")
 
-        # 8. Temporal State Machine & Fatigue Score
-        drowsy_st = st.session_state.drowsy_det.update(pred.is_closed if has_face else False, now_ts)
-        blink_occ = st.session_state.blink_det.update(pred.is_closed if has_face else False, now_ts)
-        bpm = st.session_state.blink_det.blinks_per_minute
+            # 9. Audio Alert Escalation
+            if st.session_state.sound_alerts:
+                C["audio_manager"].warning_sound = st.session_state.selected_warning_sound
+                C["audio_manager"].critical_sound = st.session_state.selected_critical_sound
+                C["audio_manager"].set_volume(st.session_state.alert_volume)
+                C["audio_manager"].repeat_interval_sec = st.session_state.repeat_interval
 
-        fatigue_res = st.session_state.fatigue_calc.update(
-            is_closed=pred.is_closed if has_face else False,
-            closure_duration_ms=drowsy_st.closure_duration_ms,
-            blinks_per_min=bpm,
-            recent_drowsy_events=drowsy_st.total_drowsy_events,
-            recent_critical_events=drowsy_st.total_critical_events,
-            current_time=now_ts,
-            recent_yawns=yawn_status.total_yawns,
-            recent_nods=head_status.total_nod_events
-        )
+                audio_html = None
+                if drowsy_st.state == DriverState.CRITICAL or head_status.is_nodding:
+                    audio_html = C["audio_manager"].trigger("CRITICAL")
+                elif drowsy_st.state == DriverState.DROWSY or yawn_status.is_yawning:
+                    audio_html = C["audio_manager"].trigger("WARNING")
+                elif phone_det or head_status.is_looking_away:
+                    audio_html = C["audio_manager"].trigger("DISTRACTION")
 
-        # 9. Audio Alert Escalation
-        audio_html = None
-        if st.session_state.sound_alerts:
-            C["audio_manager"].warning_sound = st.session_state.selected_warning_sound
-            C["audio_manager"].critical_sound = st.session_state.selected_critical_sound
-            C["audio_manager"].set_volume(st.session_state.alert_volume)
-            C["audio_manager"].repeat_interval_sec = st.session_state.repeat_interval
+                if audio_html:
+                    audio_placeholder.markdown(audio_html, unsafe_allow_html=True)
 
-            if drowsy_st.state == DriverState.CRITICAL or head_status.is_nodding:
-                audio_html = C["audio_manager"].trigger("CRITICAL")
-            elif drowsy_st.state == DriverState.DROWSY or yawn_status.is_yawning:
-                audio_html = C["audio_manager"].trigger("WARNING")
-            elif phone_det or head_status.is_looking_away:
-                audio_html = C["audio_manager"].trigger("DISTRACTION")
+            # 10. Break Reminders
+            if st.session_state.tracker:
+                elapsed_drive = now_ts - st.session_state.tracker.start_timestamp
+                if elapsed_drive >= st.session_state.break_interval_seconds:
+                    if now_ts - st.session_state.last_break_reminder > 900.0:
+                        st.session_state.last_break_reminder = now_ts
+                        banner_ph.warning(f"Take a break! Continuous driving time: {format_duration(elapsed_drive)}.")
+                        st.session_state.tracker.record_event(
+                            event_type="BREAK_REMINDER",
+                            severity="WARNING",
+                            duration_ms=0.0,
+                            details="Continuous driving duration exceeded recommended 2-hour window."
+                        )
 
-            if audio_html:
-                audio_placeholder.markdown(audio_html, unsafe_allow_html=True)
-
-        # 10. Break Reminders (2-hour continuous driving threshold)
-        if st.session_state.tracker:
-            elapsed_drive = now_ts - st.session_state.tracker.start_timestamp
-            if elapsed_drive >= st.session_state.break_interval_seconds:
-                if now_ts - st.session_state.last_break_reminder > 900.0:
-                    st.session_state.last_break_reminder = now_ts
-                    st.warning(f"Take a break! Continuous driving time: {format_duration(elapsed_drive)}.")
+            # 11. Event Recording for Event Timeline
+            if st.session_state.tracker:
+                if drowsy_st.alert_triggered and drowsy_st.closure_duration_ms >= 1200:
                     st.session_state.tracker.record_event(
-                        event_type="BREAK_REMINDER",
+                        event_type=f"DROWSINESS_{drowsy_st.alert_severity}",
+                        severity=drowsy_st.alert_severity,
+                        duration_ms=drowsy_st.closure_duration_ms,
+                        details=f"Eyes closed for {drowsy_st.closure_duration_ms / 1000:.1f}s"
+                    )
+                if yawn_status.new_yawn_event:
+                    st.session_state.tracker.record_event(
+                        event_type="YAWN",
+                        severity="WARNING",
+                        duration_ms=yawn_status.yawn_duration_s * 1000.0,
+                        details=f"Deep yawn detected (MAR {yawn_status.mar:.2f})"
+                    )
+                if head_status.is_nodding and head_status.nodding_duration_s >= 0.8:
+                    st.session_state.tracker.record_event(
+                        event_type="HEAD_NOD",
+                        severity="CRITICAL",
+                        duration_ms=head_status.nodding_duration_s * 1000.0,
+                        details=f"Forward head drop (Pitch {head_status.pitch:.1f} deg)"
+                    )
+                if phone_det:
+                    st.session_state.tracker.record_event(
+                        event_type="PHONE_DISTRACTION",
                         severity="WARNING",
                         duration_ms=0.0,
-                        details="Continuous driving duration exceeded recommended 2-hour window."
+                        details="Hand detected in facial proximity"
+                    )
+                elif head_status.is_looking_away:
+                    st.session_state.tracker.record_event(
+                        event_type="OFF_ROAD_GAZE",
+                        severity="WARNING",
+                        duration_ms=head_status.looking_away_duration_s * 1000.0,
+                        details=f"Head yaw {head_status.yaw:.1f} deg off road"
                     )
 
-        # 11. Event Recording for Event Timeline
-        if st.session_state.tracker:
-            if drowsy_st.alert_triggered and drowsy_st.closure_duration_ms >= 1200:
-                st.session_state.tracker.record_event(
-                    event_type=f"DROWSINESS_{drowsy_st.alert_severity}",
-                    severity=drowsy_st.alert_severity,
-                    duration_ms=drowsy_st.closure_duration_ms,
-                    details=f"Eyes closed for {drowsy_st.closure_duration_ms / 1000:.1f}s"
-                )
-            if yawn_status.new_yawn_event:
-                st.session_state.tracker.record_event(
-                    event_type="YAWN",
-                    severity="WARNING",
-                    duration_ms=yawn_status.yawn_duration_s * 1000.0,
-                    details=f"Deep yawn detected (MAR {yawn_status.mar:.2f})"
-                )
-            if head_status.is_nodding and head_status.nodding_duration_s >= 0.8:
-                st.session_state.tracker.record_event(
-                    event_type="HEAD_NOD",
-                    severity="CRITICAL",
-                    duration_ms=head_status.nodding_duration_s * 1000.0,
-                    details=f"Forward head drop (Pitch {head_status.pitch:.1f} deg)"
-                )
-            if phone_det:
-                st.session_state.tracker.record_event(
-                    event_type="PHONE_DISTRACTION",
-                    severity="WARNING",
-                    duration_ms=0.0,
-                    details="Hand detected in facial proximity"
-                )
-            elif head_status.is_looking_away:
-                st.session_state.tracker.record_event(
-                    event_type="OFF_ROAD_GAZE",
-                    severity="WARNING",
-                    duration_ms=head_status.looking_away_duration_s * 1000.0,
-                    details=f"Head yaw {head_status.yaw:.1f} deg off road"
-                )
-
-            # Frame telemetry
+            # Frame telemetry & FPS
             lat_ms = (time.perf_counter() - t0) * 1000.0
             fps_val = st.session_state.fps_meter.tick()
 
-            st.session_state.tracker.record_frame(
-                fatigue_score=fatigue_res.score,
-                eye_prob=pred.hybrid_open_prob,
-                is_closed=pred.is_closed,
-                drowsiness_state=drowsy_st.state.value,
-                blinks_per_min=bpm,
-                confidence=pred.confidence,
-                latency_ms=lat_ms,
-                fps=fps_val,
-                blink_occurred=blink_occ
+            if st.session_state.tracker:
+                st.session_state.tracker.record_frame(
+                    fatigue_score=fatigue_res.score,
+                    eye_prob=pred.hybrid_open_prob,
+                    is_closed=pred.is_closed,
+                    drowsiness_state=drowsy_st.state.value,
+                    blinks_per_min=bpm,
+                    confidence=pred.confidence,
+                    latency_ms=lat_ms,
+                    fps=fps_val,
+                    blink_occurred=blink_occ
+                )
+
+            # ── Render Overlays and Display Video ──────────────────────────────
+            annotated = frame.copy()
+            if has_face:
+                annotated = C["eye_detector"].draw_eye_overlays(annotated, eye_data, det_res.landmarks_px)
+
+            annotated = draw_professional_hud(
+                annotated, drowsy_st, fatigue_res.score, fps_val, lat_ms,
+                phone_det=phone_det, nod_det=head_status.is_nodding,
+                yawn_det=yawn_status.is_yawning, distract_det=head_status.is_looking_away,
+                face_detected=has_face, face_bbox=det_res.face_bbox, landmarks_px=det_res.landmarks_px
             )
-        else:
-            lat_ms = (time.perf_counter() - t0) * 1000.0
-            fps_val = st.session_state.fps_meter.tick()
 
-        # ── Render Overlays and Display Video ──────────────────────────────
-        annotated = frame.copy()
-        if has_face:
-            annotated = C["eye_detector"].draw_eye_overlays(annotated, eye_data, det_res.landmarks_px)
+            # In-place high-speed video update with JPEG compression
+            vid_ph.image(annotated, channels="BGR", width="stretch", output_format="JPEG")
 
-        annotated = draw_professional_hud(
-            annotated, drowsy_st, fatigue_res.score, fps_val, lat_ms,
-            phone_det=phone_det, nod_det=head_status.is_nodding,
-            yawn_det=yawn_status.is_yawning, distract_det=head_status.is_looking_away,
-            face_detected=has_face, face_bbox=det_res.face_bbox, landmarks_px=det_res.landmarks_px
-        )
+            # In-place Performance Strip
+            perf_ph.markdown(f"""
+            <div class="perf-strip">
+                <span><span class="pulse-dot"></span> <strong>{fps_val:.0f} FPS</strong> &nbsp;({lat_ms:.0f} ms latency)</span>
+                <span>PERCLOS: <strong>{fatigue_res.perclos:.1%}</strong></span>
+                <span>Blink Rate: <strong>{bpm:.0f}/min</strong></span>
+                <span>Cabin: <strong>{'Low Light (CLAHE)' if is_poor_light else 'Normal'}</strong></span>
+            </div>
+            """, unsafe_allow_html=True)
 
-        vid_ph.image(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB), channels="RGB", use_container_width=True)
+            # In-place Status Banner
+            if drowsy_st.state == DriverState.CRITICAL:
+                banner_ph.markdown(f"""
+                <div class="banner banner-crit">
+                    <span>🚨 CRITICAL DROWSINESS — Eyes closed {drowsy_st.closure_duration_ms/1000:.1f}s. Pull over safely immediately.</span>
+                    <span class="mono-val">EMERGENCY</span>
+                </div>""", unsafe_allow_html=True)
+            elif head_status.is_nodding:
+                banner_ph.markdown(f"""
+                <div class="banner banner-crit">
+                    <span>🚨 HEAD NODDING DETECTED — Microsleep episode detected.</span>
+                    <span class="mono-val">NOD ALERT</span>
+                </div>""", unsafe_allow_html=True)
+            elif drowsy_st.state == DriverState.DROWSY:
+                banner_ph.markdown(f"""
+                <div class="banner banner-warn">
+                    <span>⚠️ DROWSINESS WARNING — Prolonged eye closures detected. Rest advised.</span>
+                    <span class="mono-val">REST SUGGESTED</span>
+                </div>""", unsafe_allow_html=True)
+            elif yawn_status.is_yawning:
+                banner_ph.markdown(f"""
+                <div class="banner banner-warn">
+                    <span>⚠️ SUSTAINED YAWN — Driver fatigue warning (MAR {yawn_status.mar:.2f}).</span>
+                    <span class="mono-val">YAWN DETECTED</span>
+                </div>""", unsafe_allow_html=True)
+            elif phone_det:
+                banner_ph.markdown(f"""
+                <div class="banner banner-dist">
+                    <span>📵 CABIN DISTRACTION — Hand raised near face. Keep hands on wheel.</span>
+                    <span class="mono-val">DISTRACTION</span>
+                </div>""", unsafe_allow_html=True)
+            elif head_status.is_looking_away:
+                banner_ph.markdown(f"""
+                <div class="banner banner-dist">
+                    <span>👀 OFF-ROAD GAZE — Head turned away from road (Yaw {head_status.yaw:.0f}°).</span>
+                    <span class="mono-val">FOCUS</span>
+                </div>""", unsafe_allow_html=True)
+            elif not has_face:
+                banner_ph.markdown("""
+                <div class="banner banner-warn">
+                    <span>⚠️ NO DRIVER DETECTED — Center face in cabin camera frame.</span>
+                    <span class="mono-val">NO FACE</span>
+                </div>""", unsafe_allow_html=True)
+            else:
+                banner_ph.markdown("""
+                <div class="banner banner-safe">
+                    <span>✅ DRIVER ATTENTIVE — Vigilance nominal. Eyes focused on road.</span>
+                    <span class="mono-val">ALL CLEAR</span>
+                </div>""", unsafe_allow_html=True)
 
-        # Performance Strip
-        perf_ph.markdown(f"""
-        <div class="perf-strip">
-            <span><span class="pulse-dot"></span> <strong>{fps_val:.0f} FPS</strong> &nbsp;({lat_ms:.0f} ms latency)</span>
-            <span>PERCLOS: <strong>{fatigue_res.perclos:.1%}</strong></span>
-            <span>Blink Rate: <strong>{bpm:.0f}/min</strong></span>
-            <span>Cabin: <strong>{'Low Light (CLAHE)' if is_poor_light else 'Normal'}</strong></span>
-        </div>
-        """, unsafe_allow_html=True)
+            # In-place Right Column Metric Cards
+            with ph_vigilance:
+                f_clr = "#10B981" if fatigue_res.score < 35 else "#F59E0B" if fatigue_res.score < 70 else "#EF4444"
+                st.markdown(f"""
+                <div class="vigilance-card" style="border-top: 4px solid {f_clr};">
+                    <div class="mcard-lbl" style="justify-content:center;">Driver Vigilance Score</div>
+                    <div class="vigilance-val mono-val" style="color:{f_clr};">{fatigue_res.score:.0f}</div>
+                    <div class="vigilance-badge" style="background:{f_clr}22; color:{f_clr}; border:1px solid {f_clr};">
+                        {fatigue_res.level} VIGILANCE RISK
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
-        # Status Banner
-        if drowsy_st.state == DriverState.CRITICAL:
-            banner_ph.markdown(f"""
-            <div class="banner banner-crit">
-                <span>🚨 CRITICAL DROWSINESS — Eyes closed {drowsy_st.closure_duration_ms/1000:.1f}s. Pull over safely immediately.</span>
-                <span class="mono-val">EMERGENCY</span>
-            </div>""", unsafe_allow_html=True)
-        elif head_status.is_nodding:
-            banner_ph.markdown(f"""
-            <div class="banner banner-crit">
-                <span>🚨 HEAD NODDING DETECTED — Microsleep episode detected.</span>
-                <span class="mono-val">NOD ALERT</span>
-            </div>""", unsafe_allow_html=True)
-        elif drowsy_st.state == DriverState.DROWSY:
-            banner_ph.markdown(f"""
-            <div class="banner banner-warn">
-                <span>⚠️ DROWSINESS WARNING — Prolonged eye closures detected. Rest advised.</span>
-                <span class="mono-val">REST SUGGESTED</span>
-            </div>""", unsafe_allow_html=True)
-        elif yawn_status.is_yawning:
-            banner_ph.markdown(f"""
-            <div class="banner banner-warn">
-                <span>⚠️ SUSTAINED YAWN — Driver fatigue warning (MAR {yawn_status.mar:.2f}).</span>
-                <span class="mono-val">YAWN DETECTED</span>
-            </div>""", unsafe_allow_html=True)
-        elif phone_det:
-            banner_ph.markdown(f"""
-            <div class="banner banner-dist">
-                <span>📵 CABIN DISTRACTION — Hand raised near face. Keep hands on wheel.</span>
-                <span class="mono-val">DISTRACTION</span>
-            </div>""", unsafe_allow_html=True)
-        elif head_status.is_looking_away:
-            banner_ph.markdown(f"""
-            <div class="banner banner-dist">
-                <span>👀 OFF-ROAD GAZE — Head turned away from road (Yaw {head_status.yaw:.0f}°).</span>
-                <span class="mono-val">FOCUS</span>
-            </div>""", unsafe_allow_html=True)
-        elif not has_face:
-            banner_ph.markdown("""
-            <div class="banner banner-warn">
-                <span>⚠️ NO DRIVER DETECTED — Center face in cabin camera frame.</span>
-                <span class="mono-val">NO FACE</span>
-            </div>""", unsafe_allow_html=True)
-        else:
-            banner_ph.markdown("""
-            <div class="banner banner-safe">
-                <span>✅ DRIVER ATTENTIVE — Vigilance nominal. Eyes focused on road.</span>
-                <span class="mono-val">ALL CLEAR</span>
-            </div>""", unsafe_allow_html=True)
+            with ph_state:
+                st_clr = "#10B981" if drowsy_st.state == DriverState.AWAKE else "#38BDF8" if drowsy_st.state == DriverState.BLINKING else "#F59E0B" if drowsy_st.state == DriverState.DROWSY else "#EF4444"
+                st.markdown(f"""
+                <div class="mcard" style="border-left: 4px solid {st_clr};">
+                    <div class="mcard-lbl">Finite State Machine <span>Temporal Logic</span></div>
+                    <div class="mcard-val" style="font-size:1.45rem; color:{st_clr};">{drowsy_st.state.value}</div>
+                    <div class="mcard-sub">Continuous Closure: <strong>{drowsy_st.closure_duration_ms:.0f} ms</strong> • Events: {drowsy_st.total_drowsy_events}</div>
+                </div>""", unsafe_allow_html=True)
 
-        # Right Column Metric Cards
-        with ph_vigilance:
-            f_clr = "#10B981" if fatigue_res.score < 35 else "#F59E0B" if fatigue_res.score < 70 else "#EF4444"
-            st.markdown(f"""
-            <div class="vigilance-card" style="border-top: 4px solid {f_clr};">
-                <div class="mcard-lbl" style="justify-content:center;">Driver Vigilance Score</div>
-                <div class="vigilance-val mono-val" style="color:{f_clr};">{fatigue_res.score:.0f}</div>
-                <div class="vigilance-badge" style="background:{f_clr}22; color:{f_clr}; border:1px solid {f_clr};">
-                    {fatigue_res.level} VIGILANCE RISK
-                </div>
-            </div>""", unsafe_allow_html=True)
+            with ph_eyes:
+                l_c = "#10B981" if pred.left_state == "OPEN" else "#EF4444"
+                r_c = "#10B981" if pred.right_state == "OPEN" else "#EF4444"
+                st.markdown(f"""
+                <div class="mcard">
+                    <div class="mcard-lbl">Ocular Aperture <span>Hybrid Decision</span></div>
+                    <div class="mcard-val mono-val" style="font-size:1.30rem;">
+                        <span style="color:{l_c};">L: {pred.left_state}</span> &nbsp;
+                        <span style="color:{r_c};">R: {pred.right_state}</span>
+                    </div>
+                    <div class="mcard-sub">Geometric EAR: <strong>{pred.ear_val:.3f}</strong> • Open Prob: <strong>{pred.hybrid_open_prob:.0%}</strong></div>
+                </div>""", unsafe_allow_html=True)
 
-        with ph_state:
-            st_clr = "#10B981" if drowsy_st.state == DriverState.AWAKE else "#38BDF8" if drowsy_st.state == DriverState.BLINKING else "#F59E0B" if drowsy_st.state == DriverState.DROWSY else "#EF4444"
-            st.markdown(f"""
-            <div class="mcard" style="border-left: 4px solid {st_clr};">
-                <div class="mcard-lbl">Finite State Machine <span>Temporal Logic</span></div>
-                <div class="mcard-val" style="font-size:1.45rem; color:{st_clr};">{drowsy_st.state.value}</div>
-                <div class="mcard-sub">Continuous Closure: <strong>{drowsy_st.closure_duration_ms:.0f} ms</strong> • Events: {drowsy_st.total_drowsy_events}</div>
-            </div>""", unsafe_allow_html=True)
+            with ph_attention:
+                nod_clr = "#EF4444" if head_status.is_nodding else "#94A3B8"
+                y_clr = "#F59E0B" if yawn_status.is_yawning else "#94A3B8"
+                st.markdown(f"""
+                <div class="mcard">
+                    <div class="mcard-lbl">Head Pose & Yawn Monitor <span>solvePnP</span></div>
+                    <div class="mcard-val mono-val" style="font-size:1.15rem; color:{nod_clr};">
+                        Pitch: {head_status.pitch:.0f}° &nbsp; Yaw: {head_status.yaw:.0f}°
+                    </div>
+                    <div class="mcard-sub" style="color:{y_clr};">
+                        Yawn (MAR): <strong>{yawn_status.mar:.2f}</strong> ({yawn_status.total_yawns} total) &nbsp;•&nbsp; 
+                        {'📵 Phone Alert' if phone_det else '✅ Hands Clear'}
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
-        with ph_eyes:
-            l_c = "#10B981" if pred.left_state == "OPEN" else "#EF4444"
-            r_c = "#10B981" if pred.right_state == "OPEN" else "#EF4444"
-            st.markdown(f"""
-            <div class="mcard">
-                <div class="mcard-lbl">Ocular Aperture <span>Hybrid Decision</span></div>
-                <div class="mcard-val mono-val" style="font-size:1.30rem;">
-                    <span style="color:{l_c};">L: {pred.left_state}</span> &nbsp;
-                    <span style="color:{r_c};">R: {pred.right_state}</span>
-                </div>
-                <div class="mcard-sub">Geometric EAR: <strong>{pred.ear_val:.3f}</strong> • Open Prob: <strong>{pred.hybrid_open_prob:.0%}</strong></div>
-            </div>""", unsafe_allow_html=True)
-
-        with ph_attention:
-            nod_clr = "#EF4444" if head_status.is_nodding else "#94A3B8"
-            y_clr = "#F59E0B" if yawn_status.is_yawning else "#94A3B8"
-            st.markdown(f"""
-            <div class="mcard">
-                <div class="mcard-lbl">Head Pose & Yawn Monitor <span>solvePnP</span></div>
-                <div class="mcard-val mono-val" style="font-size:1.15rem; color:{nod_clr};">
-                    Pitch: {head_status.pitch:.0f}° &nbsp; Yaw: {head_status.yaw:.0f}°
-                </div>
-                <div class="mcard-sub" style="color:{y_clr};">
-                    Yawn (MAR): <strong>{yawn_status.mar:.2f}</strong> ({yawn_status.total_yawns} total) &nbsp;•&nbsp; 
-                    {'📵 Phone Alert' if phone_det else '✅ Hands Clear'}
-                </div>
-            </div>""", unsafe_allow_html=True)
-
-        # Trigger next frame with 30 FPS pacing delay
-        time.sleep(0.015)
-        st.rerun()
+            # Target stable 30 FPS pacing delay
+            pacing_delay = max(0.005, 0.033 - (lat_ms / 1000.0))
+            time.sleep(pacing_delay)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1169,7 +1267,7 @@ elif page == "Session History":
             session_ids = [s["session_id"] for s in sessions]
             selected_id = st.selectbox("Select Driving Trip", session_ids, label_visibility="collapsed")
         with col_del:
-            if st.button("Delete Session", use_container_width=True):
+            if st.button("Delete Session", width="stretch"):
                 C["db"].delete_session(selected_id)
                 st.success(f"Session {selected_id} deleted.")
                 st.rerun()
