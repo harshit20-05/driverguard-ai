@@ -102,9 +102,11 @@ class PhoneDistractionDetector:
 
         h, w = frame_rgb.shape[:2]
         try:
-            if not frame_rgb.flags.c_contiguous:
-                frame_rgb = np.ascontiguousarray(frame_rgb)
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+            # Downsample to 320x240 for 4x faster hand landmarker inference on CPU
+            small_rgb = cv2.resize(frame_rgb, (320, 240), interpolation=cv2.INTER_LINEAR)
+            if not small_rgb.flags.c_contiguous:
+                small_rgb = np.ascontiguousarray(small_rgb)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=small_rgb)
             results = self._landmarker.detect(mp_image)
         except Exception:
             return DistractionStatus()

@@ -407,6 +407,56 @@ div[data-testid="stImage"] img {
     margin-bottom: 8px;
     letter-spacing: -0.02em;
 }
+/* ── Sleek Cockpit Top Navigation Bar ─────────────────────── */
+div[data-testid="stRadio"]:has(div[role="radiogroup"]) {
+    margin-bottom: 16px !important;
+}
+
+div[data-testid="stRadio"] div[role="radiogroup"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    background: rgba(14, 20, 36, 0.90) !important;
+    padding: 6px 10px !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-radius: 12px !important;
+    backdrop-filter: blur(16px) !important;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6) !important;
+    justify-content: space-between !important;
+}
+
+div[data-testid="stRadio"] div[role="radiogroup"] > label {
+    background: transparent !important;
+    color: #94A3B8 !important;
+    border-radius: 8px !important;
+    padding: 8px 18px !important;
+    font-size: 0.90rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.18s ease-in-out !important;
+    border: 1px solid transparent !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+div[data-testid="stRadio"] div[role="radiogroup"] > label:hover {
+    color: #F8FAFC !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(56, 189, 248, 0.35) !important;
+}
+
+div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {
+    background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%) !important;
+    color: #FFFFFF !important;
+    border-color: #38BDF8 !important;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.50) !important;
+}
+
+/* Hide native radio circles on horizontal bar */
+div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
+    display: none !important;
+}
+
 .hero-sub {
     font-size: 0.90rem;
     color: var(--text-secondary);
@@ -520,6 +570,7 @@ _DEFAULTS = {
     "cam_index": 0,
     "frame_idx": 0,
     "last_phone_status": None,
+    "current_page": "Monitor",
 }
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
@@ -645,6 +696,14 @@ def draw_professional_hud(
     return frame
 
 
+PAGE_MAP = {
+    "🛡️ Live Monitor": "Monitor",
+    "📊 Session History & Audit": "Session History",
+    "🤖 AI Safety Report": "AI Safety Report",
+    "⚡ System Diagnostics": "Diagnostics",
+    "⚙️ Settings & Audio": "Settings"
+}
+
 # ──────────────────────────────────────────────────────────────────────────────
 # SIDEBAR NAVIGATION & CONTROLS
 # ──────────────────────────────────────────────────────────────────────────────
@@ -660,22 +719,31 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    page = st.radio(
-        "Navigation",
-        ["Monitor", "Session History", "AI Safety Report", "Diagnostics", "Settings"],
-        label_visibility="collapsed",
-    )
+    cur_p = st.session_state.get("current_page", "Monitor")
+    p_keys = list(PAGE_MAP.keys())
+    p_vals = list(PAGE_MAP.values())
+    p_idx = p_vals.index(cur_p) if cur_p in p_vals else 0
 
-    # Release camera handle when navigating away from Monitor
-    if page != "Monitor" and st.session_state.cap is not None:
-        st.session_state.cap.release()
-        st.session_state.cap = None
+    side_page_label = st.radio(
+        "Navigation",
+        p_keys,
+        index=p_idx,
+        label_visibility="collapsed",
+        key="sidebar_nav_radio"
+    )
+    if PAGE_MAP[side_page_label] != st.session_state.current_page:
+        st.session_state.current_page = PAGE_MAP[side_page_label]
+        if st.session_state.current_page != "Monitor" and st.session_state.cap is not None:
+            st.session_state.cap.release()
+            st.session_state.cap = None
+        st.rerun()
 
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
 
     # Primary Session Controls
     if not st.session_state.active_session:
         if st.button("⚡ Start Monitoring", type="primary", width="stretch", key="sidebar_start_btn"):
+            st.session_state.current_page = "Monitor"
             st.session_state.active_session = True
             st.session_state.tracker = SessionTracker()
             st.session_state.blink_det.reset()
@@ -770,32 +838,59 @@ audio_placeholder = st.empty()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# PERSISTENT TOP COCKPIT HEADER & HORIZONTAL NAVIGATION BAR
+# ──────────────────────────────────────────────────────────────────────────────
+# Top Cockpit Bar
+st.markdown(f"""
+<div class="cockpit-bar">
+    <div class="cockpit-brand">
+        <span style="font-size:1.4rem;">🛡️</span>
+        <div>
+            <span class="cockpit-title">DriverGuard AI</span>
+            <span class="cockpit-tag">Automotive Cockpit</span>
+        </div>
+    </div>
+    <div class="cockpit-status">
+        <div>
+            <span class="{'pulse-dot' if st.session_state.active_session else ''}" style="{'background:#64748B;' if not st.session_state.active_session else ''}"></span>
+            <strong style="margin-left:6px; color:{'#10B981' if st.session_state.active_session else '#64748B'};">
+                {'LIVE MONITORING' if st.session_state.active_session else 'STANDBY'}
+            </strong>
+        </div>
+        <div>Sensor: <strong>CAM {st.session_state.cam_index}</strong></div>
+        <div>Engine: <strong>Hybrid Geometric + CNN</strong></div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Main Cockpit Navigation Pills (Prominently visible at the top of every screen)
+cur_p = st.session_state.get("current_page", "Monitor")
+p_keys = list(PAGE_MAP.keys())
+p_vals = list(PAGE_MAP.values())
+p_idx = p_vals.index(cur_p) if cur_p in p_vals else 0
+
+top_page_label = st.radio(
+    "Cockpit Mode Selector",
+    p_keys,
+    index=p_idx,
+    horizontal=True,
+    label_visibility="collapsed",
+    key="top_nav_radio"
+)
+if PAGE_MAP[top_page_label] != st.session_state.current_page:
+    st.session_state.current_page = PAGE_MAP[top_page_label]
+    if st.session_state.current_page != "Monitor" and st.session_state.cap is not None:
+        st.session_state.cap.release()
+        st.session_state.cap = None
+    st.rerun()
+
+page = st.session_state.current_page
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # PAGE: Monitor (Executive Automotive Cockpit)
 # ──────────────────────────────────────────────────────────────────────────────
 if page == "Monitor":
-
-    # Top Cockpit Bar
-    st.markdown(f"""
-    <div class="cockpit-bar">
-        <div class="cockpit-brand">
-            <span style="font-size:1.4rem;">🛡️</span>
-            <div>
-                <span class="cockpit-title">DriverGuard AI</span>
-                <span class="cockpit-tag">Automotive Cockpit</span>
-            </div>
-        </div>
-        <div class="cockpit-status">
-            <div>
-                <span class="{'pulse-dot' if st.session_state.active_session else ''}" style="{'background:#64748B;' if not st.session_state.active_session else ''}"></span>
-                <strong style="margin-left:6px; color:{'#10B981' if st.session_state.active_session else '#64748B'};">
-                    {'LIVE MONITORING' if st.session_state.active_session else 'STANDBY'}
-                </strong>
-            </div>
-            <div>Sensor: <strong>CAM {st.session_state.cam_index}</strong></div>
-            <div>Engine: <strong>Hybrid Geometric + CNN</strong></div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
     if not st.session_state.active_session:
         # Standby View
@@ -869,22 +964,14 @@ if page == "Monitor":
         banner_ph = st.empty()
         calib_ph = st.empty()
 
-        col_vid, col_telemetry = st.columns([13, 8], gap="medium")
-
-        with col_vid:
-            vid_ph = st.empty()
-            perf_ph = st.empty()
-            col_act1, col_act2 = st.columns(2)
-            with col_act1:
-                stop_btn = st.button("⏹ Stop Monitoring", key="stop_live_btn", width="stretch")
-            with col_act2:
-                recalib_btn = st.button("⚡ Recalibrate Baseline", key="recalib_btn", width="stretch")
-
-        with col_telemetry:
-            ph_vigilance = st.empty()
-            ph_state = st.empty()
-            ph_eyes = st.empty()
-            ph_attention = st.empty()
+        # Prominent Control Bar (Always visible at top without scrolling)
+        col_act1, col_act2, col_act3 = st.columns([3, 2, 3])
+        with col_act1:
+            stop_btn = st.button("⏹ Stop Monitoring Session", key="stop_live_btn", type="primary", width="stretch")
+        with col_act2:
+            recalib_btn = st.button("⚡ Recalibrate Baseline", key="recalib_btn", width="stretch")
+        with col_act3:
+            trip_time_ph = st.empty()
 
         if stop_btn:
             st.session_state.active_session = False
@@ -904,6 +991,23 @@ if page == "Monitor":
         if recalib_btn:
             C["calibrator"].start(current_time=time.time())
             st.session_state.calibrating = True
+
+        col_vid, col_telemetry = st.columns([13, 8], gap="medium")
+
+        with col_vid:
+            vid_ph = st.empty()
+            perf_ph = st.empty()
+
+        with col_telemetry:
+            ph_vigilance = st.empty()
+            ph_state = st.empty()
+            ph_eyes = st.empty()
+            ph_attention = st.empty()
+
+        # Real-time Trip Telemetry & Safety Event Drawer
+        st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+        stats_ph = st.empty()
+        ticker_ph = st.empty()
 
         # ── Capture Frame from Hardware Camera ──────────────────────────────
         cam_idx = st.session_state.get("cam_index", 0)
@@ -1232,6 +1336,67 @@ if page == "Monitor":
                         {'📵 Phone Alert' if phone_det else '✅ Hands Clear'}
                     </div>
                 </div>""", unsafe_allow_html=True)
+
+            # Live Trip Time Counter
+            elapsed_trip = now_ts - st.session_state.tracker.start_timestamp if st.session_state.tracker else 0.0
+            trip_time_ph.markdown(f"""
+            <div style="background:rgba(14,20,36,0.85); border:1px solid rgba(255,255,255,0.12); border-radius:9px; padding:8px 14px; text-align:center;">
+                <span style="font-size:0.70rem; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.08em;">Trip Active</span>
+                <span class="mono-val" style="font-size:1.15rem; font-weight:800; color:#38BDF8; margin-left:8px;">{format_duration(elapsed_trip)}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Live 5-Metric Trip Statistics Drawer
+            tot_blinks = st.session_state.tracker.blinks if st.session_state.tracker else 0
+            tot_drowsy = drowsy_st.total_drowsy_events
+            tot_yawns = yawn_status.total_yawns
+            tot_nods = head_status.total_nod_events
+
+            stats_ph.markdown(f"""
+            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; margin-top:8px;">
+                <div class="mcard" style="padding:10px 14px; margin:0; text-align:center;">
+                    <div class="mcard-lbl" style="justify-content:center;">Blink Rate</div>
+                    <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:#F8FAFC;">{bpm:.0f} / min</div>
+                    <div class="mcard-sub">{tot_blinks} total blinks</div>
+                </div>
+                <div class="mcard" style="padding:10px 14px; margin:0; text-align:center; border-left:3px solid {'#EF4444' if tot_drowsy > 0 else '#10B981'};">
+                    <div class="mcard-lbl" style="justify-content:center;">Drowsy Warnings</div>
+                    <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:{'#EF4444' if tot_drowsy > 0 else '#10B981'};">{tot_drowsy}</div>
+                    <div class="mcard-sub">Eye closures &gt; 1.2s</div>
+                </div>
+                <div class="mcard" style="padding:10px 14px; margin:0; text-align:center; border-left:3px solid {'#F59E0B' if tot_yawns > 0 else '#10B981'};">
+                    <div class="mcard-lbl" style="justify-content:center;">Yawns Logged</div>
+                    <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:{'#F59E0B' if tot_yawns > 0 else '#10B981'};">{tot_yawns}</div>
+                    <div class="mcard-sub">MAR &gt; 0.62 sustained</div>
+                </div>
+                <div class="mcard" style="padding:10px 14px; margin:0; text-align:center; border-left:3px solid {'#EF4444' if tot_nods > 0 else '#10B981'};">
+                    <div class="mcard-lbl" style="justify-content:center;">Microsleep Nods</div>
+                    <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:{'#EF4444' if tot_nods > 0 else '#10B981'};">{tot_nods}</div>
+                    <div class="mcard-sub">solvePnP pitch drop</div>
+                </div>
+                <div class="mcard" style="padding:10px 14px; margin:0; text-align:center; border-left:3px solid {'#8B5CF6' if phone_det else '#10B981'};">
+                    <div class="mcard-lbl" style="justify-content:center;">Cabin Distraction</div>
+                    <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:{'#8B5CF6' if phone_det else '#10B981'};">{'ALERT' if phone_det else 'CLEAR'}</div>
+                    <div class="mcard-sub">Hand-to-face proximity</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Live Event Audit Ticker
+            if st.session_state.tracker and st.session_state.tracker.events:
+                recent_events = st.session_state.tracker.events[-3:]
+                event_htmls = []
+                for ev in reversed(recent_events):
+                    t_str = datetime.fromtimestamp(ev["timestamp"]).strftime("%H:%M:%S")
+                    sev_clr = "#EF4444" if ev["severity"] == "CRITICAL" else "#F59E0B" if ev["severity"] == "WARNING" else "#38BDF8"
+                    event_htmls.append(f"<span style='color:{sev_clr}; font-weight:700;'>[{t_str}]</span> <strong style='color:#F8FAFC;'>{ev['event_type']}</strong>: <span style='color:#94A3B8;'>{ev['details']}</span>")
+                ticker_text = " &nbsp;&nbsp;•&nbsp;&nbsp; ".join(event_htmls)
+                ticker_ph.markdown(f"""
+                <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px 16px; margin-top:10px; font-size:0.78rem; display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:0.68rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; padding:2px 8px; border-radius:4px; background:rgba(6,182,212,0.15); color:#06B6D4;">EVENT LOG</span>
+                    <div style="overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">{ticker_text}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
             # Target stable 30 FPS pacing delay
             pacing_delay = max(0.005, 0.033 - (lat_ms / 1000.0))
