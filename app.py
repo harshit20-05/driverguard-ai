@@ -697,7 +697,7 @@ if HAS_WEBRTC:
     class DriverVideoProcessor(VideoProcessorBase):
         def __init__(self):
             self.frame_idx = 0
-            self.fps_meter = FPSMeter(smoothing=0.85)
+            self.fps_meter = FPSMeter(window_size=30)
             self.blink_det = BlinkDetector()
             self.drowsy_det = DrowsinessDetector()
             self.fatigue_calc = FatigueScoreCalculator()
