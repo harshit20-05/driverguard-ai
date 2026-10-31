@@ -548,7 +548,7 @@ _DEFAULTS = {
     "break_interval_seconds": 7200.0,
     "audio_html_embed": "",
     "cap": None,
-    "cam_index": 0,
+    "cam_index": "browser" if (sys.platform != "win32" or bool(os.environ.get("STREAMLIT_RUNTIME_ENV"))) else 0,
     "frame_idx": 0,
     "last_phone_status": None,
 }
@@ -717,17 +717,24 @@ with st.sidebar:
 
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
 
-    # Hardware Camera Device Selector
+    # Camera Device Selector (Local Hardware DirectShow + Streamlit Cloud Browser WebCam)
     cam_devices = {
-        0: "Camera 0 (Default Webcam)",
-        1: "Camera 1 (External / Secondary)",
+        "browser": "🌐 Browser Webcam (Streamlit Cloud & Universal)",
+        0: "Camera 0 (Local Hardware Webcam - 30 FPS)",
+        1: "Camera 1 (External / Secondary Webcam)",
     }
+    cam_keys = list(cam_devices.keys())
+    cur_cam = st.session_state.get("cam_index", "browser")
+    if cur_cam not in cam_keys:
+        cur_cam = "browser"
+    cam_idx_pos = cam_keys.index(cur_cam)
+
     sel_cam = st.selectbox(
-        "Hardware Camera Sensor",
-        options=list(cam_devices.keys()),
+        "Camera Sensor Input",
+        options=cam_keys,
         format_func=lambda x: cam_devices[x],
-        index=st.session_state.cam_index,
-        help="Select which webcam to use for driver monitoring."
+        index=cam_idx_pos,
+        help="Choose Browser Webcam for Streamlit Cloud or Local Hardware for 30 FPS desktop streaming."
     )
     if sel_cam != st.session_state.cam_index:
         if st.session_state.cap is not None:
@@ -797,7 +804,7 @@ st.markdown(f"""
                 {'LIVE MONITORING' if st.session_state.active_session else 'STANDBY'}
             </strong>
         </div>
-        <div>Sensor: <strong>CAM {st.session_state.cam_index}</strong></div>
+        <div>Sensor: <strong>{'Browser WebCam' if st.session_state.cam_index == 'browser' else f'CAM {st.session_state.cam_index}'}</strong></div>
         <div>Engine: <strong>Hybrid Geometric + CNN</strong></div>
     </div>
 </div>
@@ -836,9 +843,17 @@ with tab_cockpit:
 
         st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
 
-        # Center Action Buttons
+        # Center Action Buttons & Mode Selector
         col_c1, col_c2, col_c3 = st.columns([1, 2, 1])
         with col_c2:
+            st.session_state.cam_index = st.selectbox(
+                "Camera Sensor Mode",
+                options=cam_keys,
+                format_func=lambda x: cam_devices[x],
+                index=cam_idx_pos,
+                key="hero_cam_selector",
+                help="Select Browser Webcam for Streamlit Cloud / Mobile, or Camera 0 for Local PC."
+            )
             if st.button("⚡ Start Active Driver Monitoring", type="primary", width="stretch", key="hero_start_btn"):
                 st.session_state.active_session = True
                 st.session_state.tracker = SessionTracker()
@@ -973,65 +988,15 @@ with tab_cockpit:
         stats_ph = st.empty()
         ticker_ph = st.empty()
 
-        # ── Capture Frame from Hardware Camera ──────────────────────────────
-        cam_idx = st.session_state.get("cam_index", 0)
-
-        if st.session_state.cap is None or not st.session_state.cap.isOpened():
-            if sys.platform == "win32":
-                st.session_state.cap = cv2.VideoCapture(cam_idx, cv2.CAP_DSHOW)
-            else:
-                st.session_state.cap = cv2.VideoCapture(cam_idx)
-
-            if not st.session_state.cap.isOpened():
-                st.session_state.cap = cv2.VideoCapture(cam_idx)
-
-            if st.session_state.cap.isOpened():
-                st.session_state.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                st.session_state.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                for _ in range(3):
-                    st.session_state.cap.read()
-
-        cap = st.session_state.cap
-
-        if not cap or not cap.isOpened():
-            banner_ph.error(f"⚠️ Cannot connect to Hardware Camera {cam_idx}. Ensure no other application is using the webcam.")
-            col_err1, col_err2 = st.columns(2)
-            with col_err1:
-                if st.button("🔄 Retry Camera Connection", width="stretch", key="err_retry_btn"):
-                    if st.session_state.cap is not None:
-                        st.session_state.cap.release()
-                        st.session_state.cap = None
-                    st.rerun()
-            with col_err2:
-                if st.button("Switch to Camera 1", width="stretch", key="err_switch_btn"):
-                    if st.session_state.cap is not None:
-                        st.session_state.cap.release()
-                        st.session_state.cap = None
-                    st.session_state.cam_index = 1 if cam_idx == 0 else 0
-                    st.rerun()
-            st.stop()
-
-        # ── In-Place Real-Time Vision Loop ──────────────────────────────────
-        while st.session_state.active_session:
-            ret, frame = cap.read()
-            if not ret or frame is None:
-                ret, frame = cap.read()
-                if not ret or frame is None:
-                    time.sleep(0.04)
-                    continue
-
-            t0 = time.perf_counter()
-
-            # Mirror frame horizontally so it looks natural like a mirror
-            frame = cv2.flip(frame, 1)
-            h, w = frame.shape[:2]
-
+        # ── Frame Processing Engine (Unified for Browser Webcam & Local Hardware) ──
+        def render_driver_frame(raw_frame, t_start, is_live=True):
+            h, w = raw_frame.shape[:2]
             st.session_state.frame_idx += 1
             _frame_idx = st.session_state.frame_idx
             now_ts = time.time()
 
             # 1. Cabin Illumination & CLAHE Enhancement
-            mean_lum, is_poor_light, frame_processed = C["preprocessor"].check_lighting(frame)
+            mean_lum, is_poor_light, frame_processed = C["preprocessor"].check_lighting(raw_frame)
 
             # 2. Face Landmarks & Eye Cropping
             det_res = C["detector"].detect(frame_processed)
@@ -1047,9 +1012,9 @@ with tab_cockpit:
             # 5. 3D Head Pose (solvePnP)
             head_status = C["head_pose"].update(det_res.landmarks_px, w, h, now_ts)
 
-            # 6. Phone Distraction (MediaPipe Hands throttled to every 6 frames for 30 FPS)
-            if _frame_idx % 6 == 0:
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # 6. Phone Distraction
+            if _frame_idx % (6 if is_live else 1) == 0 or st.session_state.last_phone_status is None:
+                frame_rgb = cv2.cvtColor(raw_frame, cv2.COLOR_BGR2RGB)
                 st.session_state.last_phone_status = C["distraction"].detect(frame_rgb, det_res.face_bbox)
             phone_det = st.session_state.last_phone_status.phone_detected if st.session_state.last_phone_status else False
 
@@ -1158,8 +1123,8 @@ with tab_cockpit:
                     )
 
             # Frame telemetry & FPS
-            lat_ms = (time.perf_counter() - t0) * 1000.0
-            fps_val = st.session_state.fps_meter.tick()
+            lat_ms = (time.perf_counter() - t_start) * 1000.0
+            fps_val = st.session_state.fps_meter.tick() if is_live else max(1.0, 1000.0 / max(lat_ms, 1.0))
 
             if st.session_state.tracker:
                 st.session_state.tracker.record_frame(
@@ -1175,7 +1140,7 @@ with tab_cockpit:
                 )
 
             # ── Render Overlays and Display Video ──────────────────────────────
-            annotated = frame.copy()
+            annotated = raw_frame.copy()
             if has_face:
                 annotated = C["eye_detector"].draw_eye_overlays(annotated, eye_data, det_res.landmarks_px)
 
@@ -1352,8 +1317,76 @@ with tab_cockpit:
                 </div>
                 """, unsafe_allow_html=True)
 
-            pacing_delay = max(0.005, 0.033 - (lat_ms / 1000.0))
-            time.sleep(pacing_delay)
+            return lat_ms
+
+        cam_idx = st.session_state.get("cam_index", "browser")
+
+        if cam_idx == "browser":
+            with col_vid:
+                st.markdown("""
+                <div style="background:rgba(14,20,36,0.85); border:1px solid rgba(56,189,248,0.3); border-radius:10px; padding:10px 14px; margin-bottom:10px;">
+                    <span style="color:#38BDF8; font-weight:700;">🌐 Browser Webcam Mode (Cloud Compatible)</span>
+                    <div style="color:#94A3B8; font-size:0.80rem; margin-top:3px;">Allow browser camera access below. Capture a frame to trigger AI facial detection & safety scoring.</div>
+                </div>
+                """, unsafe_allow_html=True)
+                cam_snap = st.camera_input("Cabin Sensor Feed", label_visibility="collapsed", key="browser_cam_input")
+
+            if cam_snap is not None:
+                t0 = time.perf_counter()
+                file_bytes = np.asarray(bytearray(cam_snap.read()), dtype=np.uint8)
+                frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+                if frame is not None:
+                    frame = cv2.flip(frame, 1)
+                    render_driver_frame(frame, t0, is_live=False)
+            else:
+                banner_ph.info("📸 Click the camera button above to take a photo / analyze your facial alertness.")
+        else:
+            if st.session_state.cap is None or not st.session_state.cap.isOpened():
+                if sys.platform == "win32":
+                    st.session_state.cap = cv2.VideoCapture(cam_idx, cv2.CAP_DSHOW)
+                else:
+                    st.session_state.cap = cv2.VideoCapture(cam_idx)
+
+                if not st.session_state.cap.isOpened():
+                    st.session_state.cap = cv2.VideoCapture(cam_idx)
+
+                if st.session_state.cap.isOpened():
+                    st.session_state.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    st.session_state.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    for _ in range(3):
+                        st.session_state.cap.read()
+
+            cap = st.session_state.cap
+
+            if not cap or not cap.isOpened():
+                banner_ph.warning(f"⚠️ Cannot connect to Hardware Camera {cam_idx}. On Streamlit Cloud, hardware cameras are not directly attached.")
+                col_err1, col_err2 = st.columns(2)
+                with col_err1:
+                    if st.button("🌐 Switch to Browser Webcam Mode", type="primary", width="stretch", key="err_switch_browser"):
+                        if st.session_state.cap is not None:
+                            st.session_state.cap.release()
+                            st.session_state.cap = None
+                        st.session_state.cam_index = "browser"
+                        st.rerun()
+                with col_err2:
+                    if st.button("🔄 Retry Local Camera", width="stretch", key="err_retry_btn"):
+                        st.rerun()
+                st.stop()
+
+            # Continuous loop for local desktop
+            while st.session_state.active_session:
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        time.sleep(0.04)
+                        continue
+
+                t0 = time.perf_counter()
+                frame = cv2.flip(frame, 1)
+                lat_ms = render_driver_frame(frame, t0, is_live=True)
+                pacing_delay = max(0.005, 0.033 - (lat_ms / 1000.0))
+                time.sleep(pacing_delay)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1571,7 +1604,7 @@ with tab_diag:
     """, unsafe_allow_html=True)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Hardware Sensor", f"Camera {st.session_state.cam_index}")
+    c1.metric("Hardware Sensor", "Browser WebCam" if st.session_state.cam_index == 'browser' else f"Camera {st.session_state.cam_index}")
     c2.metric("Ocular Engine", "CNN + EAR Hybrid" if C["cnn_classifier"].is_model_loaded else "Geometric EAR")
     c3.metric("AI Intelligence", "Online" if C["gemini"].is_available else "Deterministic Fallback")
     c4.metric("MediaPipe Landmarker", "Initialized" if C["detector"].is_available else "Unavailable")
