@@ -708,6 +708,7 @@ if HAS_WEBRTC:
             self.latest_telemetry = {}
             self.lock = threading.Lock()
             self.tracker = None
+            self.pending_audio_html = None
 
         def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
             try:
@@ -800,6 +801,19 @@ if HAS_WEBRTC:
                             )
                     except Exception:
                         pass
+
+                # Audio Alert Trigger
+                audio_html = None
+                if drowsy_st.state == DriverState.CRITICAL or head_status.is_nodding:
+                    audio_html = C["audio_manager"].trigger("CRITICAL")
+                elif drowsy_st.state == DriverState.DROWSY or yawn_status.is_yawning:
+                    audio_html = C["audio_manager"].trigger("WARNING")
+                elif phone_det or head_status.is_looking_away:
+                    audio_html = C["audio_manager"].trigger("DISTRACTION")
+
+                if audio_html:
+                    with self.lock:
+                        self.pending_audio_html = audio_html
 
                 # 9. Overlays & HUD Drawing
                 annotated = raw_frame.copy()
@@ -1532,11 +1546,43 @@ with tab_cockpit:
             if webrtc_ctx.video_processor and st.session_state.tracker:
                 webrtc_ctx.video_processor.tracker = st.session_state.tracker
 
-            # Read latest telemetry from processor
+            # Read latest telemetry and pending audio alerts from processor
             tel = {}
+            pending_audio = None
             if webrtc_ctx.video_processor:
                 with webrtc_ctx.video_processor.lock:
                     tel = dict(webrtc_ctx.video_processor.latest_telemetry)
+                    if hasattr(webrtc_ctx.video_processor, "pending_audio_html") and webrtc_ctx.video_processor.pending_audio_html:
+                        pending_audio = webrtc_ctx.video_processor.pending_audio_html
+                        webrtc_ctx.video_processor.pending_audio_html = None
+
+            # Render audio alerts in the browser
+            if st.session_state.sound_alerts:
+                C["audio_manager"].warning_sound = st.session_state.selected_warning_sound
+                C["audio_manager"].critical_sound = st.session_state.selected_critical_sound
+                C["audio_manager"].set_volume(st.session_state.alert_volume)
+                C["audio_manager"].repeat_interval_sec = st.session_state.repeat_interval
+                C["audio_manager"].enabled = True
+
+                if pending_audio:
+                    audio_placeholder.markdown(pending_audio, unsafe_allow_html=True)
+                elif tel:
+                    d_st_val = tel.get("drowsy_state")
+                    is_nod = tel.get("is_nodding", False)
+                    is_yawn = tel.get("is_yawning", False)
+                    is_phone = tel.get("phone_det", False)
+                    is_distract = tel.get("is_looking_away", False)
+
+                    audio_fallback = None
+                    if d_st_val == DriverState.CRITICAL or is_nod:
+                        audio_fallback = C["audio_manager"].trigger("CRITICAL")
+                    elif d_st_val == DriverState.DROWSY or is_yawn:
+                        audio_fallback = C["audio_manager"].trigger("WARNING")
+                    elif is_phone or is_distract:
+                        audio_fallback = C["audio_manager"].trigger("DISTRACTION")
+
+                    if audio_fallback:
+                        audio_placeholder.markdown(audio_fallback, unsafe_allow_html=True)
 
             if tel:
                 f_score = tel.get("fatigue_score", 0.0)
@@ -2029,15 +2075,20 @@ with tab_settings:
         st.session_state.alert_volume = st.slider("Alert Volume", 0.1, 1.0, float(st.session_state.alert_volume), 0.05)
         st.session_state.repeat_interval = st.slider("Repeat Interval (sec)", 0.8, 4.0, float(st.session_state.repeat_interval), 0.2)
 
-    col_test1, col_test2 = st.columns(2)
+    col_test1, col_test2, col_test3 = st.columns(3)
     with col_test1:
-        if st.button("🔊 Test Warning Sound (In Browser)", width="stretch", key="test_warn_sound_btn"):
+        if st.button("🔊 Test Warning Chime", width="stretch", key="test_warn_sound_btn"):
             test_html = C["audio_manager"].trigger("WARNING", force=True)
             if test_html:
                 audio_placeholder.markdown(test_html, unsafe_allow_html=True)
     with col_test2:
-        if st.button("🚨 Test Critical Siren (In Browser)", width="stretch", key="test_crit_sound_btn"):
+        if st.button("🚨 Test Critical Siren", width="stretch", key="test_crit_sound_btn"):
             test_html = C["audio_manager"].trigger("CRITICAL", force=True)
+            if test_html:
+                audio_placeholder.markdown(test_html, unsafe_allow_html=True)
+    with col_test3:
+        if st.button("📵 Test Distraction Chirp", width="stretch", key="test_distract_sound_btn"):
+            test_html = C["audio_manager"].trigger("DISTRACTION", force=True)
             if test_html:
                 audio_placeholder.markdown(test_html, unsafe_allow_html=True)
 

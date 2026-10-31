@@ -193,12 +193,46 @@ class AudioAlertManager:
         # 1. Asynchronous native audio playback fallback (winsound or terminal bell)
         self._play_native_async(sound_name)
 
-        # 2. Return HTML5 base64 audio string for browser frontend
+        # 2. Return HTML5 base64 audio string with Web Audio API auto-trigger for browser frontend
         data_uri = SoundLibrary.get_base64_data_uri(sound_name, self.volume)
-        # Hidden audio tag with unique key so browser plays immediately
-        audio_html = f"""<audio autoplay style="display:none">
-            <source src="{data_uri}" type="audio/wav">
-        </audio>"""
+        uid = int(now * 1000)
+        synth_freq = 1400 if sound_name == "siren" else 900 if sound_name == "rising" else 650
+        audio_html = f"""<div id="dg_audio_wrap_{uid}" style="display:none;">
+            <audio id="dg_audio_{uid}" autoplay>
+                <source src="{data_uri}" type="audio/wav">
+            </audio>
+            <script>
+            (function() {{
+                try {{
+                    var snd = document.getElementById("dg_audio_{uid}");
+                    if (snd) {{
+                        snd.volume = {self.volume};
+                        var playPromise = snd.play();
+                        if (playPromise !== undefined) {{
+                            playPromise.catch(function() {{
+                                try {{
+                                    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+                                    if (AudioCtx) {{
+                                        var ctx = new AudioCtx();
+                                        var osc = ctx.createOscillator();
+                                        var gain = ctx.createGain();
+                                        osc.type = "sine";
+                                        osc.frequency.setValueAtTime({synth_freq}, ctx.currentTime);
+                                        gain.gain.setValueAtTime({self.volume}, ctx.currentTime);
+                                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                                        osc.connect(gain);
+                                        gain.connect(ctx.destination);
+                                        osc.start();
+                                        osc.stop(ctx.currentTime + 0.5);
+                                    }}
+                                }} catch(e) {{}}
+                            }});
+                        }}
+                    }}
+                }} catch(err) {{}}
+            }})();
+            </script>
+        </div>"""
         return audio_html
 
     def _play_native_async(self, sound_name: str):
