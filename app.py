@@ -1302,7 +1302,7 @@ with tab_cockpit:
             </div>
             """, unsafe_allow_html=True)
 
-            tot_blinks = st.session_state.tracker.blinks if st.session_state.tracker else 0
+            tot_blinks = st.session_state.tracker.blink_count if st.session_state.tracker else st.session_state.blink_det.total_blinks
             tot_drowsy = drowsy_st.total_drowsy_events
             tot_yawns = yawn_status.total_yawns
             tot_nods = head_status.total_nod_events
