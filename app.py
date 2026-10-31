@@ -18,6 +18,7 @@ Production-grade automotive safety dashboard featuring:
 import os
 import sys
 import time
+import threading
 from pathlib import Path
 from datetime import datetime
 
@@ -25,6 +26,26 @@ import cv2
 import numpy as np
 import pandas as pd
 import streamlit as st
+
+try:
+    import av
+    from streamlit_webrtc import (
+        webrtc_streamer,
+        VideoProcessorBase,
+        RTCConfiguration,
+        WebRtcMode,
+    )
+    HAS_WEBRTC = True
+except ImportError:
+    HAS_WEBRTC = False
+
+RTC_CONFIG = RTCConfiguration({
+    "iceServers": [
+        {"urls": ["stun:stun.l.google.com:19302"]},
+        {"urls": ["stun:stun1.l.google.com:19302"]},
+        {"urls": ["stun:stun2.l.google.com:19302"]},
+    ]
+}) if HAS_WEBRTC else None
 
 sys.path.insert(0, str(Path(__file__).parent.resolve()))
 
@@ -494,6 +515,7 @@ def get_system_components():
         enabled=True
     )
     calibrator = DriverCalibrator(target_duration_sec=15.0, min_samples=40)
+    fatigue_calc = FatigueScoreCalculator()
 
     gemini = GeminiService(
         api_key=cfg["ai"]["api_key"],
@@ -515,6 +537,7 @@ def get_system_components():
         "distraction": distraction_det,
         "audio_manager": audio_manager,
         "calibrator": calibrator,
+        "fatigue_calc": fatigue_calc,
         "gemini": gemini,
         "report_chain": report_chain,
         "safety_assistant": safety_assistant,
@@ -548,7 +571,7 @@ _DEFAULTS = {
     "break_interval_seconds": 7200.0,
     "audio_html_embed": "",
     "cap": None,
-    "cam_index": "browser" if (sys.platform != "win32" or bool(os.environ.get("STREAMLIT_RUNTIME_ENV"))) else 0,
+    "cam_index": "webrtc" if HAS_WEBRTC else ("snapshot" if (sys.platform != "win32" or bool(os.environ.get("STREAMLIT_RUNTIME_ENV"))) else 0),
     "frame_idx": 0,
     "last_phone_status": None,
 }
@@ -668,6 +691,166 @@ def draw_professional_hud(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# WebRTC Video Processor (Live 30 FPS Stream with In-Frame HUD Overlays)
+# ──────────────────────────────────────────────────────────────────────────────
+if HAS_WEBRTC:
+    class DriverVideoProcessor(VideoProcessorBase):
+        def __init__(self):
+            self.frame_idx = 0
+            self.fps_meter = FPSMeter(smoothing=0.85)
+            self.blink_det = BlinkDetector()
+            self.drowsy_det = DrowsinessDetector()
+            self.fatigue_calc = FatigueScoreCalculator()
+            self.yawn_det = YawnDetector(mar_threshold=0.62, min_yawn_duration_sec=1.2)
+            self.head_pose = HeadPoseEstimator(nod_pitch_threshold=-15.0, distract_yaw_threshold=24.0)
+            self.distraction_det = PhoneDistractionDetector()
+            self.last_phone_status = None
+            self.latest_telemetry = {}
+            self.lock = threading.Lock()
+            self.tracker = None
+
+        def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
+            try:
+                raw_frame = frame.to_ndarray(format="bgr24")
+                if raw_frame is None:
+                    return frame
+
+                raw_frame = cv2.flip(raw_frame, 1)
+                h, w = raw_frame.shape[:2]
+                t_start = time.perf_counter()
+                now_ts = time.time()
+                self.frame_idx += 1
+
+                # 1. Illumination & CLAHE check
+                mean_lum, is_poor_light, frame_processed = C["preprocessor"].check_lighting(raw_frame)
+
+                # 2. Face Landmark Detection
+                det_res = C["detector"].detect(frame_processed)
+                has_face = (det_res.landmarks_px is not None)
+
+                # 3. Eye Extraction & Hybrid Inference
+                eye_data = C["eye_detector"].extract_eyes(frame_processed, det_res.landmarks_px if has_face else None)
+                pred = C["hybrid_classifier"].predict(eye_data)
+
+                # 4. Yawn (MAR)
+                yawn_status = self.yawn_det.update(det_res.landmarks_px if has_face else None, now_ts)
+
+                # 5. Head Pose (solvePnP)
+                head_status = self.head_pose.update(det_res.landmarks_px if has_face else None, w, h, now_ts)
+
+                # 6. Distraction Detection (sampled)
+                if self.frame_idx % 6 == 0 or self.last_phone_status is None:
+                    frame_rgb = cv2.cvtColor(raw_frame, cv2.COLOR_BGR2RGB)
+                    self.last_phone_status = self.distraction_det.detect(frame_rgb, det_res.face_bbox if has_face else None)
+                phone_det = self.last_phone_status.phone_detected if self.last_phone_status else False
+
+                # 7. State Machine & Fatigue Score
+                drowsy_st = self.drowsy_det.update(pred.is_closed if has_face else False, now_ts)
+                blink_occ = self.blink_det.update(pred.is_closed if has_face else False, now_ts)
+                bpm = self.blink_det.blinks_per_minute
+
+                fatigue_res = self.fatigue_calc.update(
+                    is_closed=pred.is_closed if has_face else False,
+                    closure_duration_ms=drowsy_st.closure_duration_ms,
+                    blinks_per_min=bpm,
+                    recent_drowsy_events=drowsy_st.total_drowsy_events,
+                    recent_critical_events=drowsy_st.total_critical_events,
+                    current_time=now_ts,
+                    recent_yawns=yawn_status.total_yawns,
+                    recent_nods=head_status.total_nod_events
+                )
+
+                lat_ms = (time.perf_counter() - t_start) * 1000.0
+                fps_val = self.fps_meter.tick()
+
+                # 8. Record to tracker if attached
+                if self.tracker is not None:
+                    try:
+                        self.tracker.record_frame(
+                            fatigue_score=fatigue_res.score,
+                            eye_prob=pred.hybrid_open_prob,
+                            is_closed=pred.is_closed,
+                            drowsiness_state=drowsy_st.state.value,
+                            blinks_per_min=bpm,
+                            confidence=pred.confidence,
+                            latency_ms=lat_ms,
+                            fps=fps_val,
+                            blink_occurred=blink_occ
+                        )
+                        if drowsy_st.alert_triggered and drowsy_st.closure_duration_ms >= 1200:
+                            self.tracker.record_event(
+                                event_type=f"DROWSINESS_{drowsy_st.alert_severity}",
+                                severity=drowsy_st.alert_severity,
+                                duration_ms=drowsy_st.closure_duration_ms,
+                                details=f"Eyes closed for {drowsy_st.closure_duration_ms / 1000:.1f}s"
+                            )
+                        if yawn_status.new_yawn_event:
+                            self.tracker.record_event(
+                                event_type="YAWN",
+                                severity="WARNING",
+                                duration_ms=yawn_status.yawn_duration_s * 1000.0,
+                                details=f"MAR reached {yawn_status.mar:.2f}"
+                            )
+                        if head_status.is_nodding:
+                            self.tracker.record_event(
+                                event_type="HEAD_NOD",
+                                severity="CRITICAL",
+                                duration_ms=head_status.nod_duration_s * 1000.0,
+                                details=f"Head pitch {head_status.pitch:.1f} deg drop"
+                            )
+                    except Exception:
+                        pass
+
+                # 9. Overlays & HUD Drawing
+                annotated = raw_frame.copy()
+                if has_face:
+                    annotated = C["eye_detector"].draw_eye_overlays(annotated, eye_data, det_res.landmarks_px)
+
+                annotated = draw_professional_hud(
+                    annotated, drowsy_st, fatigue_res.score, fps_val, lat_ms,
+                    phone_det=phone_det, nod_det=head_status.is_nodding,
+                    yawn_det=yawn_status.is_yawning, distract_det=head_status.is_looking_away,
+                    face_detected=has_face, face_bbox=det_res.face_bbox, landmarks_px=det_res.landmarks_px
+                )
+
+                with self.lock:
+                    self.latest_telemetry = {
+                        "fps": fps_val,
+                        "latency_ms": lat_ms,
+                        "fatigue_score": fatigue_res.score,
+                        "fatigue_level": fatigue_res.level,
+                        "perclos": fatigue_res.perclos,
+                        "drowsy_state": drowsy_st.state,
+                        "closure_ms": drowsy_st.closure_duration_ms,
+                        "drowsy_events": drowsy_st.total_drowsy_events,
+                        "left_state": pred.left_state,
+                        "right_state": pred.right_state,
+                        "ear_val": pred.ear_val,
+                        "open_prob": pred.hybrid_open_prob,
+                        "pitch": head_status.pitch,
+                        "yaw": head_status.yaw,
+                        "is_nodding": head_status.is_nodding,
+                        "is_looking_away": head_status.is_looking_away,
+                        "mar": yawn_status.mar,
+                        "is_yawning": yawn_status.is_yawning,
+                        "total_yawns": yawn_status.total_yawns,
+                        "total_nods": head_status.total_nod_events,
+                        "phone_det": phone_det,
+                        "blinks": self.blink_det.total_blinks,
+                        "bpm": bpm,
+                        "has_face": has_face,
+                        "is_poor_light": is_poor_light,
+                        "updated_at": now_ts,
+                    }
+
+                return av.VideoFrame.from_ndarray(annotated, format="bgr24")
+            except Exception:
+                return frame
+else:
+    DriverVideoProcessor = None
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # SIDEBAR QUICK STATUS & DEVICE SELECTOR
 # ──────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -717,16 +900,17 @@ with st.sidebar:
 
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
 
-    # Camera Device Selector (Local Hardware DirectShow + Streamlit Cloud Browser WebCam)
+    # Camera Device Selector (Live WebRTC + Local Hardware DirectShow + Snapshot Fallback)
     cam_devices = {
-        "browser": "🌐 Browser Webcam (Streamlit Cloud & Universal)",
+        "webrtc": "🌐 Live WebRTC Camera (Cloud & Browser 30 FPS)",
         0: "Camera 0 (Local Hardware Webcam - 30 FPS)",
         1: "Camera 1 (External / Secondary Webcam)",
+        "snapshot": "📸 Browser Snapshot Mode (Single Capture Fallback)",
     }
     cam_keys = list(cam_devices.keys())
-    cur_cam = st.session_state.get("cam_index", "browser")
+    cur_cam = st.session_state.get("cam_index", "webrtc")
     if cur_cam not in cam_keys:
-        cur_cam = "browser"
+        cur_cam = "webrtc"
     cam_idx_pos = cam_keys.index(cur_cam)
 
     sel_cam = st.selectbox(
@@ -734,7 +918,7 @@ with st.sidebar:
         options=cam_keys,
         format_func=lambda x: cam_devices[x],
         index=cam_idx_pos,
-        help="Choose Browser Webcam for Streamlit Cloud or Local Hardware for 30 FPS desktop streaming."
+        help="Choose Live WebRTC Camera for 30 FPS browser streaming or Local Hardware for desktop streaming."
     )
     if sel_cam != st.session_state.cam_index:
         if st.session_state.cap is not None:
@@ -852,7 +1036,7 @@ with tab_cockpit:
                 format_func=lambda x: cam_devices[x],
                 index=cam_idx_pos,
                 key="hero_cam_selector",
-                help="Select Browser Webcam for Streamlit Cloud / Mobile, or Camera 0 for Local PC."
+                help="Select Live WebRTC Camera for 30 FPS Cloud & Browser streaming, or Camera 0 for Local PC."
             )
             if st.button("⚡ Start Active Driver Monitoring", type="primary", width="stretch", key="hero_start_btn"):
                 st.session_state.active_session = True
@@ -1319,13 +1503,133 @@ with tab_cockpit:
 
             return lat_ms
 
-        cam_idx = st.session_state.get("cam_index", "browser")
+        cam_idx = st.session_state.get("cam_index", "webrtc")
 
-        if cam_idx == "browser":
+        if cam_idx == "webrtc" and HAS_WEBRTC:
             with col_vid:
                 st.markdown("""
                 <div style="background:rgba(14,20,36,0.85); border:1px solid rgba(56,189,248,0.3); border-radius:10px; padding:10px 14px; margin-bottom:10px;">
-                    <span style="color:#38BDF8; font-weight:700;">🌐 Browser Webcam Mode (Cloud Compatible)</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:#38BDF8; font-weight:700;">🌐 Live 30 FPS WebRTC Streamer (Cloud & Browser)</span>
+                        <span style="font-size:0.75rem; color:#10B981; font-weight:700;">● REAL-TIME ENGINE ACTIVE</span>
+                    </div>
+                    <div style="color:#94A3B8; font-size:0.80rem; margin-top:3px;">
+                        Click <strong>START</strong> below to connect your webcam. Dynamic FPS, facial reticle tracking, and vigilance HUD are rendered directly onto the 30 FPS stream.
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                webrtc_ctx = webrtc_streamer(
+                    key="driverguard_live_stream",
+                    mode=WebRtcMode.SENDRECV,
+                    rtc_configuration=RTC_CONFIG,
+                    video_processor_factory=DriverVideoProcessor,
+                    media_stream_constraints={"video": {"width": {"ideal": 640}, "height": {"ideal": 480}}, "audio": False},
+                    async_processing=True,
+                )
+
+            # Link session tracker to processor
+            if webrtc_ctx.video_processor and st.session_state.tracker:
+                webrtc_ctx.video_processor.tracker = st.session_state.tracker
+
+            # Read latest telemetry from processor
+            tel = {}
+            if webrtc_ctx.video_processor:
+                with webrtc_ctx.video_processor.lock:
+                    tel = dict(webrtc_ctx.video_processor.latest_telemetry)
+
+            if tel:
+                f_score = tel.get("fatigue_score", 0.0)
+                f_lvl = tel.get("fatigue_level", "LOW")
+                f_clr = "#10B981" if f_score < 35 else "#F59E0B" if f_score < 70 else "#EF4444"
+                with ph_vigilance:
+                    st.markdown(f"""
+                    <div class="vigilance-card" style="border-top: 4px solid {f_clr};">
+                        <div class="mcard-lbl" style="justify-content:center;">Driver Vigilance Score</div>
+                        <div class="vigilance-val mono-val" style="color:{f_clr};">{f_score:.0f}</div>
+                        <div class="vigilance-badge" style="background:{f_clr}22; color:{f_clr}; border:1px solid {f_clr};">
+                            {f_lvl} VIGILANCE RISK
+                        </div>
+                    </div>""", unsafe_allow_html=True)
+
+                d_st = tel.get("drowsy_state", DriverState.AWAKE)
+                st_val = d_st.value if hasattr(d_st, "value") else str(d_st)
+                st_clr = "#10B981" if st_val == "AWAKE" else "#38BDF8" if st_val == "BLINKING" else "#F59E0B" if st_val == "DROWSY" else "#EF4444"
+                with ph_state:
+                    st.markdown(f"""
+                    <div class="mcard" style="border-left: 4px solid {st_clr};">
+                        <div class="mcard-lbl">Finite State Machine <span>Temporal Logic</span></div>
+                        <div class="mcard-val" style="font-size:1.45rem; color:{st_clr};">{st_val}</div>
+                        <div class="mcard-sub">Continuous Closure: <strong>{tel.get('closure_ms', 0):.0f} ms</strong> • Events: {tel.get('drowsy_events', 0)}</div>
+                    </div>""", unsafe_allow_html=True)
+
+                l_c = "#10B981" if tel.get("left_state") == "OPEN" else "#EF4444"
+                r_c = "#10B981" if tel.get("right_state") == "OPEN" else "#EF4444"
+                with ph_eyes:
+                    st.markdown(f"""
+                    <div class="mcard">
+                        <div class="mcard-lbl">Ocular Aperture <span>Hybrid Decision</span></div>
+                        <div class="mcard-val mono-val" style="font-size:1.30rem;">
+                            <span style="color:{l_c};">L: {tel.get('left_state', 'OPEN')}</span> &nbsp;
+                            <span style="color:{r_c};">R: {tel.get('right_state', 'OPEN')}</span>
+                        </div>
+                        <div class="mcard-sub">Geometric EAR: <strong>{tel.get('ear_val', 0.28):.3f}</strong> • Open Prob: <strong>{tel.get('open_prob', 0.9):.0%}</strong></div>
+                    </div>""", unsafe_allow_html=True)
+
+                nod_clr = "#EF4444" if tel.get("is_nodding") else "#94A3B8"
+                y_clr = "#F59E0B" if tel.get("is_yawning") else "#94A3B8"
+                with ph_attention:
+                    st.markdown(f"""
+                    <div class="mcard">
+                        <div class="mcard-lbl">Head Pose & Yawn Monitor <span>solvePnP</span></div>
+                        <div class="mcard-val mono-val" style="font-size:1.15rem; color:{nod_clr};">
+                            Pitch: {tel.get('pitch', 0):.0f}° &nbsp; Yaw: {tel.get('yaw', 0):.0f}°
+                        </div>
+                        <div class="mcard-sub" style="color:{y_clr};">
+                            Yawn (MAR): <strong>{tel.get('mar', 0):.2f}</strong> ({tel.get('total_yawns', 0)} total) &nbsp;•&nbsp; 
+                            {'📵 Phone Alert' if tel.get('phone_det') else '✅ Hands Clear'}
+                        </div>
+                    </div>""", unsafe_allow_html=True)
+
+                stats_ph.markdown(f"""
+                <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; margin-top:8px;">
+                    <div class="mcard" style="padding:10px 14px; margin:0; text-align:center;">
+                        <div class="mcard-lbl" style="justify-content:center;">Blink Rate</div>
+                        <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:#F8FAFC;">{tel.get('bpm', 0):.0f} / min</div>
+                        <div class="mcard-sub">{tel.get('blinks', 0)} total blinks</div>
+                    </div>
+                    <div class="mcard" style="padding:10px 14px; margin:0; text-align:center; border-left:3px solid {'#EF4444' if tel.get('drowsy_events', 0) > 0 else '#10B981'};">
+                        <div class="mcard-lbl" style="justify-content:center;">Drowsy Warnings</div>
+                        <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:{'#EF4444' if tel.get('drowsy_events', 0) > 0 else '#10B981'};">{tel.get('drowsy_events', 0)}</div>
+                        <div class="mcard-sub">Eye closures &gt; 1.2s</div>
+                    </div>
+                    <div class="mcard" style="padding:10px 14px; margin:0; text-align:center; border-left:3px solid {'#F59E0B' if tel.get('total_yawns', 0) > 0 else '#10B981'};">
+                        <div class="mcard-lbl" style="justify-content:center;">Yawns Logged</div>
+                        <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:{'#F59E0B' if tel.get('total_yawns', 0) > 0 else '#10B981'};">{tel.get('total_yawns', 0)}</div>
+                        <div class="mcard-sub">MAR &gt; 0.62 sustained</div>
+                    </div>
+                    <div class="mcard" style="padding:10px 14px; margin:0; text-align:center; border-left:3px solid {'#EF4444' if tel.get('total_nods', 0) > 0 else '#10B981'};">
+                        <div class="mcard-lbl" style="justify-content:center;">Microsleep Nods</div>
+                        <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:{'#EF4444' if tel.get('total_nods', 0) > 0 else '#10B981'};">{tel.get('total_nods', 0)}</div>
+                        <div class="mcard-sub">solvePnP pitch drop</div>
+                    </div>
+                    <div class="mcard" style="padding:10px 14px; margin:0; text-align:center; border-left:3px solid {'#8B5CF6' if tel.get('phone_det') else '#10B981'};">
+                        <div class="mcard-lbl" style="justify-content:center;">Cabin Distraction</div>
+                        <div class="mono-val" style="font-size:1.20rem; font-weight:800; color:{'#8B5CF6' if tel.get('phone_det') else '#10B981'};">{'ALERT' if tel.get('phone_det') else 'CLEAR'}</div>
+                        <div class="mcard-sub">Hand-to-face proximity</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            if webrtc_ctx.state.playing:
+                time.sleep(1.0)
+                st.rerun()
+
+        elif cam_idx == "snapshot" or (cam_idx == "browser"):
+            with col_vid:
+                st.markdown("""
+                <div style="background:rgba(14,20,36,0.85); border:1px solid rgba(56,189,248,0.3); border-radius:10px; padding:10px 14px; margin-bottom:10px;">
+                    <span style="color:#38BDF8; font-weight:700;">📸 Browser Snapshot Mode (Single Capture Fallback)</span>
                     <div style="color:#94A3B8; font-size:0.80rem; margin-top:3px;">Allow browser camera access below. Capture a frame to trigger AI facial detection & safety scoring.</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1362,11 +1666,11 @@ with tab_cockpit:
                 banner_ph.warning(f"⚠️ Cannot connect to Hardware Camera {cam_idx}. On Streamlit Cloud, hardware cameras are not directly attached.")
                 col_err1, col_err2 = st.columns(2)
                 with col_err1:
-                    if st.button("🌐 Switch to Browser Webcam Mode", type="primary", width="stretch", key="err_switch_browser"):
+                    if st.button("🌐 Switch to Live WebRTC Camera", type="primary", width="stretch", key="err_switch_webrtc"):
                         if st.session_state.cap is not None:
                             st.session_state.cap.release()
                             st.session_state.cap = None
-                        st.session_state.cam_index = "browser"
+                        st.session_state.cam_index = "webrtc"
                         st.rerun()
                 with col_err2:
                     if st.button("🔄 Retry Local Camera", width="stretch", key="err_retry_btn"):
