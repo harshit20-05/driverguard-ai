@@ -1454,7 +1454,10 @@ with tab_history:
                         "duration_ms": "Duration (ms)",
                         "details": "Description"
                     }, inplace=True)
-                    st.dataframe(display_df, use_container_width=True, hide_index=True)
+                    try:
+                        st.dataframe(display_df, width="stretch", hide_index=True)
+                    except Exception:
+                        st.table(display_df)
                 else:
                     st.info("No safety warning or critical alert events were triggered during this trip.")
 
@@ -1630,7 +1633,10 @@ with tab_diag:
             total_lat = np.mean(t_face) + np.mean(t_crop) + np.mean(t_cnn) + np.mean(t_yawn) + np.mean(t_head) + np.mean(t_fatigue)
             est_fps = 1000.0 / total_lat if total_lat > 0 else 30.0
 
-            st.dataframe(pd.DataFrame(bench_data), use_container_width=True, hide_index=True)
+            try:
+                st.dataframe(pd.DataFrame(bench_data), width="stretch", hide_index=True)
+            except Exception:
+                st.table(pd.DataFrame(bench_data))
 
             c_b1, c_b2, c_b3 = st.columns(3)
             c_b1.metric("Total Pipeline Latency", f"{total_lat:.1f} ms")
